@@ -103,21 +103,33 @@ export default function PaginaDetalheVelocidade() {
 
       <section className="mx-auto max-w-6xl px-6 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-          {/* Header + Voltar */}
+          {/* Header + Botões */}
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold">Dashboard do Upload</h1>
               <p className="mt-1 text-white/70">Velocidade</p>
             </div>
 
-            <button
-              type="button"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
-              onClick={() => router.push("/relatorios/velocidade")}
-            >
-              Voltar
-            </button>
+            {/* Grupo de botões */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+                onClick={() => {}}
+              >
+                Baixar Infrações
+              </button>
+
+              <button
+                type="button"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+                onClick={() => router.push("/relatorios/velocidade")}
+              >
+                Voltar
+              </button>
+            </div>
           </div>
+
 
           {erro && (
             <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80">
