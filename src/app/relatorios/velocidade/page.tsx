@@ -129,7 +129,7 @@ export default function PaginaVelocidade() {
 
           <nav className="hidden items-center gap-2 md:flex">
             <BotaoMenu texto="Home" aoClicar={() => router.push("/home")} />
-            <BotaoMenu texto="Campeonato" aoClicar={() => router.push("/campeonato")} />
+            <BotaoMenu texto="Campeonato" aoClicar={() => router.push("/campeonato?")} />
           </nav>
 
           <div className="flex items-center gap-2">

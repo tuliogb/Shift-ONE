@@ -19,19 +19,18 @@ export default function PaginaLigadoDesligado() {
   const [carregando, setCarregando] = useState(true);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const [processandoId, setProcessandoId] = useState<string | null>(null);
 
   useEffect(() => {
     async function carregar() {
       setErro(null);
 
-      // 1) proteger rota
       const { data: sessaoData } = await supabase.auth.getSession();
       if (!sessaoData.session) {
         router.replace("/login");
         return;
       }
 
-      // 2) buscar uploads de ligado_desligado
       const { data, error } = await supabase
         .from("uploads")
         .select("id, criado_em, nome_arquivo, tipo, caminho_storage, tamanho_bytes, status")
@@ -74,13 +73,47 @@ export default function PaginaLigadoDesligado() {
     return `${mb.toFixed(2)} MB`;
   }
 
+  async function aoClicarUpload(uploadId: string) {
+    try {
+      setErro(null);
+      setProcessandoId(uploadId);
+
+      // 1) Se já tem dashboard pronto, NÃO chama edge: só navega
+      const { data: dash, error: errDash } = await supabase
+        .from("dashboards")
+        .select("resumo")
+        .eq("upload_id", uploadId)
+        .single();
+
+      if (!errDash && dash?.resumo?.ok === true && dash?.resumo?.processado_global === true) {
+        router.push(`/relatorios/ligado-desligado/${uploadId}`);
+        return;
+      }
+
+      // 2) Senão chama edge pra processar
+      // OBS: troque o nome abaixo pelo nome exato da sua nova função
+      const { data, error } = await supabase.functions.invoke("processar-horas", {
+        body: { upload_id: uploadId },
+      });
+
+      if (error) {
+        console.error("ERRO EDGE:", error);
+        setErro("Falha ao iniciar processamento (edge function).");
+        return;
+      }
+
+      console.log("RETORNO data:", data);
+      router.push(`/relatorios/ligado-desligado/${uploadId}`);
+    } finally {
+      setProcessandoId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen text-white">
-      {/* Fundo */}
       <div className="fixed inset-0 -z-10 bg-[#070B12]" />
       <div className="fixed inset-0 -z-10 opacity-90 bg-[radial-gradient(1200px_circle_at_20%_15%,rgba(0,174,239,0.22),transparent_55%),radial-gradient(900px_circle_at_80%_20%,rgba(120,68,255,0.18),transparent_55%),radial-gradient(900px_circle_at_60%_85%,rgba(0,174,239,0.14),transparent_55%)]" />
 
-      {/* Header simples (Home + Campeonato + Sair) */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#070B12]/60 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -122,13 +155,12 @@ export default function PaginaLigadoDesligado() {
         </div>
       </header>
 
-      {/* Conteúdo */}
       <section className="mx-auto max-w-7xl px-6 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
           <div>
-            <h1 className="text-2xl font-semibold">Ligado e Desligado</h1>
+            <h1 className="text-2xl font-semibold">Dirigindo e Parado</h1>
             <p className="mt-1 text-white/70">
-              Histórico de uploads do relatório de ligado e desligado.
+              Histórico de uploads do relatório de dirigindo e parado.
             </p>
           </div>
 
@@ -148,7 +180,7 @@ export default function PaginaLigadoDesligado() {
             </div>
           ) : (
             <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-              <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60 gap-x-6">
+              <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60">
                 <div className="col-span-6">Arquivo</div>
                 <div className="col-span-3">Data</div>
                 <div className="col-span-2 text-right">Tamanho</div>
@@ -156,36 +188,45 @@ export default function PaginaLigadoDesligado() {
               </div>
 
               <div className="divide-y divide-white/10">
-                {uploads.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className="grid w-full grid-cols-12 items-center gap-x-6 px-4 py-4 text-left hover:bg-white/5 transition"
-                    onClick={() => router.push(`/relatorios/ligado-desligado/${u.id}`)}
-                  >
-                    <div className="col-span-6">
-                      <p className="text-sm font-semibold text-white/90 line-clamp-1">
-                        {u.nome_arquivo}
-                      </p>
-                      <p className="mt-1 text-xs text-white/50 line-clamp-1">
-                        {u.caminho_storage}
-                      </p>
-                    </div>
+                {uploads.map((u) => {
+                  const bloqueado = processandoId === u.id;
 
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      disabled={bloqueado}
+                      className={`grid w-full grid-cols-12 items-center px-4 py-4 text-left transition ${
+                        bloqueado ? "opacity-60 cursor-not-allowed" : "hover:bg-white/5"
+                      }`}
+                      onClick={() => aoClicarUpload(u.id)}
+                    >
+                      <div className="col-span-6">
+                        <p className="text-sm font-semibold text-white/90 line-clamp-1">
+                          {u.nome_arquivo}
+                        </p>
+                        <p className="mt-1 text-xs text-white/50 line-clamp-1">
+                          {u.caminho_storage}
+                        </p>
+                        {bloqueado && (
+                          <p className="mt-2 text-xs text-white/60">Processando...</p>
+                        )}
+                      </div>
 
-                    <div className="col-span-3 text-sm text-white/80">
-                      {formatarData(u.criado_em)}
-                    </div>
+                      <div className="col-span-3 text-sm text-white/80">
+                        {formatarData(u.criado_em)}
+                      </div>
 
-                    <div className="col-span-2 text-right text-sm text-white/80">
-                      {formatarTamanho(u.tamanho_bytes)}
-                    </div>
+                      <div className="col-span-2 text-right text-sm text-white/80">
+                        {formatarTamanho(u.tamanho_bytes)}
+                      </div>
 
-                    <div className="col-span-1 text-right text-xs text-white/60">
-                      {u.status ?? "-"}
-                    </div>
-                  </button>
-                ))}
+                      <div className="col-span-1 text-right text-xs text-white/60">
+                        {u.status ?? "-"}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

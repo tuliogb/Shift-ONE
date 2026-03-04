@@ -94,6 +94,20 @@ export default function Home() {
     return nome.endsWith(".xlsx");
   }
 
+  function validarTipoRelatorio(f: File, tipo: "velocidade" | "ligado_desligado") {
+  const nome = f.name.toLowerCase();
+
+  if (tipo === "velocidade") {
+    return nome.includes("velocidade");
+  }
+
+  if (tipo === "ligado_desligado") {
+    return nome.includes("dirigindo") || nome.includes("parado");
+  }
+
+  return false;
+}
+
   function limparNomeArquivo(nome: string) {
     return nome
       .normalize("NFD") // separa acentos
@@ -381,6 +395,23 @@ export default function Home() {
                       if (!validarXlsx(f)) {
                         setStatusUpload("erro");
                         setMensagemUpload("Envie um arquivo .xlsx");
+                        input.value = "";
+                        return;
+                      }
+
+                      if (!validarTipoRelatorio(f, tipoRelatorio)) {
+                        setStatusUpload("erro");
+
+                        if (tipoRelatorio === "velocidade") {
+                          setMensagemUpload(
+                            "Este arquivo não parece ser um relatório de velocidade."
+                          );
+                        } else {
+                          setMensagemUpload(
+                            "Este arquivo não parece ser o relatório correto."
+                          );
+                        }
+
                         input.value = "";
                         return;
                       }

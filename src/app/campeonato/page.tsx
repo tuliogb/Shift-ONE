@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-type LinhaGlobal = {
+type LinhaVelocidade = {
   placa: string;
   qtd_infracoes: number | null;
   dias_pego: number | null;
@@ -12,7 +12,18 @@ type LinhaGlobal = {
   atualizado_em: string | null;
 };
 
-type SortKey = "infracoes" | "proporcao" | "tratativas";
+type LinhaHoras = {
+  placa: string;
+  qtd_infracoes_10h: number | null;
+  qtd_gravissimas_12h: number | null;
+  dias_pego: number | null;
+  tratativa: number | null;
+  atualizado_em: string | null;
+};
+
+type TipoCampeonato = "velocidade" | "horas";
+type SortKeyVel = "infracoes" | "proporcao" | "tratativas";
+type SortKeyHoras = "infracoes10" | "gravissimas12" | "proporcao" | "tratativas";
 
 function normalizarPlaca(valor: string) {
   return String(valor ?? "")
@@ -32,11 +43,15 @@ export default function PaginaCampeonato() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [linhas, setLinhas] = useState<LinhaGlobal[]>([]);
+  const [tipoCampeonato, setTipoCampeonato] = useState<TipoCampeonato>("velocidade");
+
+  const [linhasVel, setLinhasVel] = useState<LinhaVelocidade[]>([]);
+  const [linhasHoras, setLinhasHoras] = useState<LinhaHoras[]>([]);
   const [totalDiasOperacao, setTotalDiasOperacao] = useState<number>(0);
 
-  const [sortKey, setSortKey] = useState<SortKey>("infracoes");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [sortKeyVel, setSortKeyVel] = useState<SortKeyVel>("infracoes");
+  const [sortKeyHoras, setSortKeyHoras] = useState<SortKeyHoras>("infracoes10");
 
   useEffect(() => {
     async function carregar() {
@@ -49,34 +64,44 @@ export default function PaginaCampeonato() {
         return;
       }
 
-      // 1) total de dias do sistema (operacao_dias)
+      // 1) total de dias do sistema
       const { count: countDias, error: errDias } = await supabase
         .from("operacao_dias")
         .select("dia", { count: "exact", head: true });
 
       if (errDias) {
         console.error(errDias);
-        // não é fatal, só vai zerar proporção
         setTotalDiasOperacao(0);
       } else {
         setTotalDiasOperacao(countDias ?? 0);
       }
 
-      // 2) dados globais
-      const { data, error } = await supabase
-        .from("velocidade_global")
-        .select("placa, qtd_infracoes, dias_pego, tratativa, atualizado_em")
-        .limit(5000);
+      // 2) carrega os dois rankings (sem depender de UI)
+      const [{ data: vData, error: vErr }, { data: hData, error: hErr }] = await Promise.all([
+        supabase
+          .from("velocidade_global")
+          .select("placa, qtd_infracoes, dias_pego, tratativa, atualizado_em")
+          .limit(5000),
+        supabase
+          .from("horas_global")
+          .select("placa, qtd_infracoes_10h, qtd_gravissimas_12h, dias_pego, tratativa, atualizado_em")
+          .limit(5000),
+      ]);
 
-      if (error) {
-        console.error(error);
-        setErro("Falha ao buscar ranking (velocidade_global).");
-        setLinhas([]);
+      if (vErr) console.error("velocidade_global:", vErr);
+      if (hErr) console.error("horas_global:", hErr);
+
+      // Se os dois falharem, mostra erro geral
+      if (vErr && hErr) {
+        setErro("Falha ao buscar ranking (velocidade_global e horas_global).");
+        setLinhasVel([]);
+        setLinhasHoras([]);
         setCarregando(false);
         return;
       }
 
-      setLinhas((data ?? []) as LinhaGlobal[]);
+      setLinhasVel((vData ?? []) as LinhaVelocidade[]);
+      setLinhasHoras((hData ?? []) as LinhaHoras[]);
       setCarregando(false);
     }
 
@@ -85,59 +110,102 @@ export default function PaginaCampeonato() {
 
   const linhasOrdenadas = useMemo(() => {
     const td = totalDiasOperacao;
+    const mult = sortDir === "desc" ? -1 : 1;
 
-    const lista = (linhas ?? []).map((l) => {
+    if (tipoCampeonato === "velocidade") {
+      const lista = (linhasVel ?? []).map((l) => {
+        const placa = normalizarPlaca(l.placa);
+        const infracoes = l.qtd_infracoes ?? 0;
+        const diasPegos = l.dias_pego ?? 0;
+        const tratativa = l.tratativa ?? 0;
+        const proporcao = td > 0 ? diasPegos / td : 0;
+
+        return { ...l, placa, infracoes, diasPegos, tratativa, proporcao };
+      });
+
+      lista.sort((a, b) => {
+        const va =
+          sortKeyVel === "infracoes"
+            ? a.infracoes
+            : sortKeyVel === "tratativas"
+              ? a.tratativa
+              : a.proporcao;
+
+        const vb =
+          sortKeyVel === "infracoes"
+            ? b.infracoes
+            : sortKeyVel === "tratativas"
+              ? b.tratativa
+              : b.proporcao;
+
+        if (va < vb) return 1 * mult;
+        if (va > vb) return -1 * mult;
+
+        if (a.infracoes !== b.infracoes) return b.infracoes - a.infracoes;
+        return a.placa.localeCompare(b.placa);
+      });
+
+      return { tipo: "velocidade" as const, lista };
+    }
+
+    // horas
+    const lista = (linhasHoras ?? []).map((l) => {
       const placa = normalizarPlaca(l.placa);
-      const infracoes = l.qtd_infracoes ?? 0;
+      const infracoes10 = l.qtd_infracoes_10h ?? 0;
+      const gravissimas12 = l.qtd_gravissimas_12h ?? 0;
       const diasPegos = l.dias_pego ?? 0;
       const tratativa = l.tratativa ?? 0;
       const proporcao = td > 0 ? diasPegos / td : 0;
 
-      return {
-        ...l,
-        placa,
-        infracoes,
-        diasPegos,
-        tratativa,
-        proporcao,
-      };
+      return { ...l, placa, infracoes10, gravissimas12, diasPegos, tratativa, proporcao };
     });
-
-    const mult = sortDir === "desc" ? -1 : 1;
 
     lista.sort((a, b) => {
       const va =
-        sortKey === "infracoes"
-          ? a.infracoes
-          : sortKey === "tratativas"
-            ? a.tratativa
-            : a.proporcao;
+        sortKeyHoras === "infracoes10"
+          ? a.infracoes10
+          : sortKeyHoras === "gravissimas12"
+            ? a.gravissimas12
+            : sortKeyHoras === "tratativas"
+              ? a.tratativa
+              : a.proporcao;
 
       const vb =
-        sortKey === "infracoes"
-          ? b.infracoes
-          : sortKey === "tratativas"
-            ? b.tratativa
-            : b.proporcao;
+        sortKeyHoras === "infracoes10"
+          ? b.infracoes10
+          : sortKeyHoras === "gravissimas12"
+            ? b.gravissimas12
+            : sortKeyHoras === "tratativas"
+              ? b.tratativa
+              : b.proporcao;
 
-      // desc padrão: maior primeiro
       if (va < vb) return 1 * mult;
       if (va > vb) return -1 * mult;
 
-      // desempate por infrações (desc) e depois placa
-      if (a.infracoes !== b.infracoes) return b.infracoes - a.infracoes;
+      // desempate: gravissimas > infracoes10 > placa
+      if (a.gravissimas12 !== b.gravissimas12) return b.gravissimas12 - a.gravissimas12;
+      if (a.infracoes10 !== b.infracoes10) return b.infracoes10 - a.infracoes10;
       return a.placa.localeCompare(b.placa);
     });
 
-    return lista;
-  }, [linhas, sortKey, sortDir, totalDiasOperacao]);
+    return { tipo: "horas" as const, lista };
+  }, [tipoCampeonato, linhasVel, linhasHoras, sortDir, sortKeyVel, sortKeyHoras, totalDiasOperacao]);
 
-  function setOrdenacao(chave: SortKey) {
-    if (chave === sortKey) {
+  function setOrdenacaoVel(chave: SortKeyVel) {
+    if (chave === sortKeyVel) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
       return;
     }
-    setSortKey(chave);
+    setSortKeyVel(chave);
+    setSortDir("desc");
+  }
+
+  function setOrdenacaoHoras(chave: SortKeyHoras) {
+    if (chave === sortKeyHoras) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortKeyHoras(chave);
     setSortDir("desc");
   }
 
@@ -169,7 +237,6 @@ export default function PaginaCampeonato() {
 
           <nav className="hidden items-center gap-2 md:flex">
             <BotaoMenu texto="Home" aoClicar={() => router.push("/home")} />
-            <BotaoMenu texto="Velocidade" aoClicar={() => router.push("/relatorios/velocidade")} />
           </nav>
 
           <div className="flex items-center gap-2">
@@ -189,7 +256,6 @@ export default function PaginaCampeonato() {
         <div className="md:hidden border-t border-white/10">
           <div className="mx-auto flex max-w-7xl gap-2 px-6 py-3">
             <BotaoMenu texto="Home" aoClicar={() => router.push("/home")} />
-            <BotaoMenu texto="Velocidade" aoClicar={() => router.push("/relatorios/velocidade")} />
           </div>
         </div>
       </header>
@@ -208,26 +274,64 @@ export default function PaginaCampeonato() {
               </p>
             </div>
 
-
-
-            {/* Botões de ordenação */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <BotaoFiltro
-                ativo={sortKey === "infracoes"}
-                texto={`Infrações ${sortKey === "infracoes" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
-                aoClicar={() => setOrdenacao("infracoes")}
+                ativo={tipoCampeonato === "velocidade"}
+                texto="Velocidade"
+                aoClicar={() => setTipoCampeonato("velocidade")}
               />
               <BotaoFiltro
-                ativo={sortKey === "proporcao"}
-                texto={`Proporção de dias ${sortKey === "proporcao" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
-                aoClicar={() => setOrdenacao("proporcao")}
-              />
-              <BotaoFiltro
-                ativo={sortKey === "tratativas"}
-                texto={`Tratativas ${sortKey === "tratativas" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
-                aoClicar={() => setOrdenacao("tratativas")}
+                ativo={tipoCampeonato === "horas"}
+                texto="Dirigindo e Parado"
+                aoClicar={() => setTipoCampeonato("horas")}
               />
             </div>
+          </div>
+
+          {/* Ordenação */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tipoCampeonato === "velocidade" ? (
+              <>
+                <BotaoFiltro
+                  ativo={sortKeyVel === "infracoes"}
+                  texto={`Infrações ${sortKeyVel === "infracoes" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoVel("infracoes")}
+                />
+                <BotaoFiltro
+                  ativo={sortKeyVel === "proporcao"}
+                  texto={`Proporção de dias ${sortKeyVel === "proporcao" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoVel("proporcao")}
+                />
+                <BotaoFiltro
+                  ativo={sortKeyVel === "tratativas"}
+                  texto={`Tratativas ${sortKeyVel === "tratativas" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoVel("tratativas")}
+                />
+              </>
+            ) : (
+              <>
+                <BotaoFiltro
+                  ativo={sortKeyHoras === "infracoes10"}
+                  texto={`Infrações (≥10h) ${sortKeyHoras === "infracoes10" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoHoras("infracoes10")}
+                />
+                <BotaoFiltro
+                  ativo={sortKeyHoras === "gravissimas12"}
+                  texto={`Gravíssimas (≥12h) ${sortKeyHoras === "gravissimas12" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoHoras("gravissimas12")}
+                />
+                <BotaoFiltro
+                  ativo={sortKeyHoras === "proporcao"}
+                  texto={`Proporção de dias ${sortKeyHoras === "proporcao" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoHoras("proporcao")}
+                />
+                <BotaoFiltro
+                  ativo={sortKeyHoras === "tratativas"}
+                  texto={`Tratativas ${sortKeyHoras === "tratativas" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  aoClicar={() => setOrdenacaoHoras("tratativas")}
+                />
+              </>
+            )}
           </div>
 
           {erro && (
@@ -240,51 +344,91 @@ export default function PaginaCampeonato() {
             <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
               Carregando ranking...
             </div>
-          ) : linhasOrdenadas.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
-              Ainda não existem dados na velocidade_global.
-            </div>
           ) : (
-            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-              <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60">
-                <div className="col-span-1">#</div>
-                <div className="col-span-3">Placa</div>
-                <div className="col-span-2">Infrações</div>
-                <div className="col-span-2">Dias pego</div>
-                <div className="col-span-2">Proporção</div>
-                <div className="col-span-2 text-right">Tratativas</div>
-              </div>
-
-              <div className="divide-y divide-white/10">
-                {linhasOrdenadas.map((l, idx) => (
-                  <button
-                    key={l.placa}
-                    type="button"
-                    className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm hover:bg-white/5 transition"
-                    onClick={() => {
-                      // rota do campeonato (sem uploadId)
-                      const url = `/campeonato/placa/${l.placa}`;
-                      window.open(url, "_blank", "noopener,noreferrer");
-                    }}
-                    title="Abrir detalhes globais desta placa"
-                  >
-                    <div className="col-span-1 text-white/70">
-                      {medalhaPorPosicao(idx) ? (
-                        <span title={`Top ${idx + 1}`}>{medalhaPorPosicao(idx)}</span>
-                      ) : (
-                        idx + 1
-                      )}
+            <>
+              {linhasOrdenadas.tipo === "velocidade" ? (
+                linhasOrdenadas.lista.length === 0 ? (
+                  <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                    Ainda não existem dados na velocidade_global.
+                  </div>
+                ) : (
+                  <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+                    <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60">
+                      <div className="col-span-1">#</div>
+                      <div className="col-span-3">Placa</div>
+                      <div className="col-span-2">Infrações</div>
+                      <div className="col-span-2">Dias pego</div>
+                      <div className="col-span-2">Proporção</div>
+                      <div className="col-span-2 text-right">Tratativas</div>
                     </div>
 
-                    <div className="col-span-3 font-semibold">{l.placa}</div>
-                    <div className="col-span-2">{l.infracoes}</div>
-                    <div className="col-span-2">{l.diasPegos}</div>
-                    <div className="col-span-2">{formatarPorcentagem(l.proporcao)}</div>
-                    <div className="col-span-2 text-right">{l.tratativa}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+                    <div className="divide-y divide-white/10">
+                      {linhasOrdenadas.lista.map((l: any, idx: number) => (
+                        <button
+                          key={l.placa}
+                          type="button"
+                          className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm hover:bg-white/5 transition"
+                          onClick={() => {
+                            const url = `/campeonato/placa/${l.placa}`;
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          <div className="col-span-1 text-white/70">
+                            {medalhaPorPosicao(idx) ? medalhaPorPosicao(idx) : idx + 1}
+                          </div>
+
+                          <div className="col-span-3 font-semibold">{l.placa}</div>
+                          <div className="col-span-2">{l.infracoes}</div>
+                          <div className="col-span-2">{l.diasPegos}</div>
+                          <div className="col-span-2">{formatarPorcentagem(l.proporcao)}</div>
+                          <div className="col-span-2 text-right">{l.tratativa}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ) : linhasOrdenadas.lista.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                  Ainda não existem dados na horas_global.
+                </div>
+              ) : (
+                <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+                  <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60">
+                    <div className="col-span-1">#</div>
+                    <div className="col-span-3">Placa</div>
+                    <div className="col-span-2">Infrações (≥10h)</div>
+                    <div className="col-span-2">Gravíssimas (≥12h)</div>
+                    <div className="col-span-2">Proporção</div>
+                    <div className="col-span-2 text-right">Tratativas</div>
+                  </div>
+
+                  <div className="divide-y divide-white/10">
+                    {linhasOrdenadas.lista.map((l: any, idx: number) => (
+                      <button
+                        key={l.placa}
+                        type="button"
+                        className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm hover:bg-white/5 transition"
+                        onClick={() => {
+                          // rota separada pra horas (opcional, mas recomendo)
+                          const url = `/campeonato/horas/placa/${l.placa}`;
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        <div className="col-span-1 text-white/70">
+                          {medalhaPorPosicao(idx) ? medalhaPorPosicao(idx) : idx + 1}
+                        </div>
+
+                        <div className="col-span-3 font-semibold">{l.placa}</div>
+                        <div className="col-span-2">{l.infracoes10}</div>
+                        <div className="col-span-2">{l.gravissimas12}</div>
+                        <div className="col-span-2">{formatarPorcentagem(l.proporcao)}</div>
+                        <div className="col-span-2 text-right">{l.tratativa}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -319,9 +463,7 @@ function BotaoFiltro({
       onClick={aoClicar}
       className={[
         "rounded-xl border px-4 py-2 text-sm font-semibold transition",
-        ativo
-          ? "border-white/20 bg-white/15 hover:bg-white/20"
-          : "border-white/10 bg-white/5 hover:bg-white/10",
+        ativo ? "border-white/20 bg-white/15 hover:bg-white/20" : "border-white/10 bg-white/5 hover:bg-white/10",
       ].join(" ")}
     >
       {texto}
