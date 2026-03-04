@@ -2,13 +2,24 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !service) {
+    throw new Error("SUPABASE_URL e/ou SUPABASE_SERVICE_ROLE_KEY ausentes na Vercel.");
+  }
+
+  return createClient(url, service);
+}
 
 export async function POST(req: Request) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+
     const { upload_id } = await req.json();
 
     if (!upload_id) {
@@ -50,14 +61,12 @@ export async function POST(req: Request) {
     const linhas = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: null });
 
     // 4) PROCESSAMENTO (placeholder real)
-    // >>> aqui no próximo passo a gente ajusta com as colunas reais do seu relatório de velocidade <<<
     const totalLinhas = linhas.length;
 
     const resumo = {
       nome_arquivo: upload.nome_arquivo,
       total_linhas: totalLinhas,
       gerado_em: new Date().toISOString(),
-      // depois: total_infracoes, placas, motoristas, etc
     };
 
     // 5) salvar dashboards
@@ -86,7 +95,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, resumo });
   } catch (e: any) {
-    console.error(e);
+    console.error("ERRO /api/processar:", e);
     return NextResponse.json(
       { erro: e?.message || "Erro inesperado" },
       { status: 500 }
