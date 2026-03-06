@@ -363,16 +363,11 @@ export default function PaginaCampeonato() {
                     </div>
 
                     <div className="divide-y divide-white/10">
-                      {linhasOrdenadas.lista.map((l: any, idx: number) => (
-                        <button
-                          key={l.placa}
-                          type="button"
-                          className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm hover:bg-white/5 transition"
-                          onClick={() => {
-                            const url = `/campeonato/placa/${l.placa}`;
-                            window.open(url, "_blank", "noopener,noreferrer");
-                          }}
-                        >
+                          {linhasOrdenadas.lista.map((l: any, idx: number) => (
+                            <div
+                              key={l.placa}
+                              className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm"
+                            >
                           <div className="col-span-1 text-white/70">
                             {medalhaPorPosicao(idx) ? medalhaPorPosicao(idx) : idx + 1}
                           </div>
@@ -382,7 +377,7 @@ export default function PaginaCampeonato() {
                           <div className="col-span-2">{l.diasPegos}</div>
                           <div className="col-span-2">{formatarPorcentagem(l.proporcao)}</div>
                           <div className="col-span-2 text-right">{l.tratativa}</div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -403,17 +398,11 @@ export default function PaginaCampeonato() {
                   </div>
 
                   <div className="divide-y divide-white/10">
-                    {linhasOrdenadas.lista.map((l: any, idx: number) => (
-                      <button
-                        key={l.placa}
-                        type="button"
-                        className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm hover:bg-white/5 transition"
-                        onClick={() => {
-                          // rota separada pra horas (opcional, mas recomendo)
-                          const url = `/campeonato/horas/placa/${l.placa}`;
-                          window.open(url, "_blank", "noopener,noreferrer");
-                        }}
-                      >
+                        {linhasOrdenadas.lista.map((l: any, idx: number) => (
+                          <div
+                            key={l.placa}
+                            className="grid w-full grid-cols-12 items-center px-4 py-3 text-left text-sm"
+                        >
                         <div className="col-span-1 text-white/70">
                           {medalhaPorPosicao(idx) ? medalhaPorPosicao(idx) : idx + 1}
                         </div>
@@ -423,7 +412,7 @@ export default function PaginaCampeonato() {
                         <div className="col-span-2">{l.gravissimas12}</div>
                         <div className="col-span-2">{formatarPorcentagem(l.proporcao)}</div>
                         <div className="col-span-2 text-right">{l.tratativa}</div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>

@@ -264,7 +264,7 @@ export default function Home() {
               href="/relatorios/ligado-desligado"
               className="rounded-xl px-4 py-2 text-sm font-semibold border bg-white/5 border-white/10 hover:bg-white/10"
             >
-              Ligado e Desligado
+              Dirigindo e Parado
             </Link>
           </nav>
 
@@ -296,7 +296,7 @@ export default function Home() {
               href="/relatorios/ligado-desligado"
               className="rounded-xl px-4 py-2 text-sm font-semibold border bg-white/5 border-white/10 hover:bg-white/10"
             >
-              Ligado e Desligado
+              Dirigindo e Parado
             </Link>
           </div>
         </div>
@@ -358,7 +358,7 @@ export default function Home() {
                   />
 
                   <OpcaoRelatorio
-                    titulo="Ligado e Desligado"
+                    titulo="Dirigindo e Parado"
                     descricao="Tempo rodando direto"
                     selecionado={tipoRelatorio === "ligado_desligado"}
                     aoClicar={() => setTipoRelatorio("ligado_desligado")}
