@@ -283,12 +283,12 @@ export default function PaginaPlacaLigadoDesligado() {
 
             <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs text-white/60">Infrações (≥10h)</p>
+                <p className="text-xs text-white/60">Infrações (≥12h)</p>
                 <p className="mt-1 text-lg font-semibold">{global?.qtd_infracoes_10h ?? "-"}</p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs text-white/60">Gravíssimas (≥12h)</p>
+                <p className="text-xs text-white/60">Gravíssimas (≥14h)</p>
                 <p className="mt-1 text-lg font-semibold">{global?.qtd_gravissimas_12h ?? "-"}</p>
               </div>
 

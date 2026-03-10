@@ -227,11 +227,11 @@ return (
                 <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                   <Card titulo="Placas pegas" valor={String(totalPlacas)} />
                   <Card titulo="Eventos" valor={String(totalEventos)} />
-                  <Card titulo="Gravíssimas (≥12h)" valor={String(totalGravissimas12)} />
+                  <Card titulo="Gravíssimas (≥14h)" valor={String(totalGravissimas12)} />
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Card titulo="Infrações (≥10h)" valor={String(totalInfracoes10)} />
+                  <Card titulo="Infrações (≥12h)" valor={String(totalInfracoes10)} />
                   <Card titulo="Dia operação" valor={resumo?.dia_operacao ?? "-"} />
                 </div>
 

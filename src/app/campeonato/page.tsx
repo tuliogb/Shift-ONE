@@ -312,12 +312,12 @@ export default function PaginaCampeonato() {
               <>
                 <BotaoFiltro
                   ativo={sortKeyHoras === "infracoes10"}
-                  texto={`Infrações (≥10h) ${sortKeyHoras === "infracoes10" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  texto={`Infrações (≥12h) ${sortKeyHoras === "infracoes10" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
                   aoClicar={() => setOrdenacaoHoras("infracoes10")}
                 />
                 <BotaoFiltro
                   ativo={sortKeyHoras === "gravissimas12"}
-                  texto={`Gravíssimas (≥12h) ${sortKeyHoras === "gravissimas12" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
+                  texto={`Gravíssimas (≥14h) ${sortKeyHoras === "gravissimas12" ? (sortDir === "desc" ? "↓" : "↑") : ""}`}
                   aoClicar={() => setOrdenacaoHoras("gravissimas12")}
                 />
                 <BotaoFiltro
@@ -391,8 +391,8 @@ export default function PaginaCampeonato() {
                   <div className="grid grid-cols-12 bg-white/5 px-4 py-3 text-xs text-white/60">
                     <div className="col-span-1">#</div>
                     <div className="col-span-3">Placa</div>
-                    <div className="col-span-2">Infrações (≥10h)</div>
-                    <div className="col-span-2">Gravíssimas (≥12h)</div>
+                    <div className="col-span-2">Infrações (≥12h)</div>
+                    <div className="col-span-2">Gravíssimas (≥14h)</div>
                     <div className="col-span-2">Proporção</div>
                     <div className="col-span-2 text-right">Tratativas</div>
                   </div>
